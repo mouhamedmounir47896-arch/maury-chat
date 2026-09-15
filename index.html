@@ -1,0 +1,1556 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Maury Chat</title>
+<script src="/socket.io/socket.io.js"></script>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#efeae2}
+button,input{font:inherit}
+
+#welcome{
+min-height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:20px;
+background:linear-gradient(135deg,#075e54,#128c7e)
+}
+
+.box{
+width:100%;
+max-width:420px;
+background:#fff;
+border-radius:20px;
+padding:32px;
+text-align:center;
+box-shadow:0 10px 30px #0003
+}
+
+.logo{font-size:56px}
+.box h1{color:#075e54}
+
+.box input{
+width:100%;
+padding:14px;
+border:1px solid #ccc;
+border-radius:10px;
+margin-top:12px
+}
+
+.primary{
+width:100%;
+padding:14px;
+border:0;
+border-radius:10px;
+background:#25d366;
+color:#fff;
+font-weight:700;
+margin-top:12px;
+cursor:pointer
+}
+
+#app{display:none;height:100vh}
+
+.top{
+height:65px;
+background:#075e54;
+color:#fff;
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:0 14px
+}
+
+.top-right{display:flex;gap:8px}
+
+.top button{
+border:0;
+color:#fff;
+border-radius:8px;
+padding:9px 12px;
+cursor:pointer
+}
+
+.add{background:#25d366}
+.logout{background:#128c7e}
+
+.layout{
+height:calc(100vh - 65px);
+display:flex
+}
+
+.contacts{
+width:320px;
+background:#fff;
+border-right:1px solid #ddd;
+overflow:auto
+}
+
+.ctitle{
+padding:18px;
+font-weight:700;
+font-size:20px
+}
+
+.contact{
+padding:16px;
+border-top:1px solid #eee;
+cursor:pointer
+}
+
+.contact.active,.contact:hover{background:#e9f7f2}
+
+.empty{
+padding:20px;
+text-align:center;
+color:#777
+}
+
+.chat{
+flex:1;
+display:flex;
+flex-direction:column
+}
+
+.emptychat{
+flex:1;
+display:flex;
+align-items:center;
+justify-content:center;
+color:#777;
+text-align:center
+}
+
+.chathead{
+height:65px;
+background:#fff;
+border-bottom:1px solid #ddd;
+display:flex;
+align-items:center;
+padding:0 12px;
+gap:10px
+}
+
+.avatar{
+width:42px;
+height:42px;
+border-radius:50%;
+background:#25d366;
+color:#fff;
+display:flex;
+align-items:center;
+justify-content:center;
+font-weight:700
+}
+
+.call{
+margin-left:auto;
+border:0;
+background:#25d366;
+color:#fff;
+width:44px;
+height:44px;
+border-radius:50%;
+cursor:pointer;
+font-size:20px
+}
+
+.messages{
+flex:1;
+overflow:auto;
+padding:20px
+}
+
+.msg{
+width:max-content;
+max-width:75%;
+padding:10px 14px;
+background:#fff;
+border-radius:10px;
+margin-bottom:10px
+}
+
+.msg.me{
+margin-left:auto;
+background:#d9fdd3
+}
+
+.time{
+display:block;
+font-size:10px;
+color:#777;
+margin-top:4px
+}
+
+.composer{
+display:flex;
+gap:8px;
+padding:10px;
+background:#f0f2f5
+}
+
+.composer input{
+flex:1;
+border:0;
+border-radius:24px;
+padding:14px;
+outline:0
+}
+
+.send,.mic{
+width:46px;
+height:46px;
+border:0;
+border-radius:50%;
+color:#fff;
+font-size:20px;
+cursor:pointer
+}
+
+.send{background:#075e54}
+.mic{background:#25d366}
+.mic.rec{background:#e53935}
+.audio{max-width:240px}
+
+.modal{
+display:none;
+position:fixed;
+inset:0;
+background:#0008;
+align-items:center;
+justify-content:center;
+padding:20px;
+z-index:10
+}
+
+.modalbox{
+width:100%;
+max-width:400px;
+background:#fff;
+border-radius:18px;
+padding:24px;
+text-align:center
+}
+
+.modalbox input{
+width:100%;
+padding:14px;
+border:1px solid #ccc;
+border-radius:10px
+}
+
+.modalbox button{
+width:100%;
+padding:13px;
+border:0;
+border-radius:10px;
+margin-top:10px;
+cursor:pointer
+}
+
+.green{background:#25d366;color:#fff}
+.red{background:#e53935;color:#fff}
+.gray{background:#ddd}
+.dark{background:#075e54;color:#fff}
+
+@media(max-width:700px){
+.contacts{width:100%}
+.chat{display:none}
+.chat.mobile{display:flex}
+.contacts.hide{display:none}
+.top h2{font-size:18px}
+.top button{font-size:12px;padding:8px}
+}
+</style>
+</head>
+
+<body>
+
+<section id="welcome">
+<div class="box">
+<div class="logo">💬</div>
+
+<h1>Bienvenue sur Maury Chat</h1>
+<p>Écrivez votre nom</p>
+
+<input
+id="name"
+placeholder="Votre nom"
+maxlength="30"
+>
+
+<button class="primary" id="continueBtn">
+Continuer
+</button>
+</div>
+</section>
+
+
+<section id="app">
+
+<header class="top">
+<h2>💬 Maury Chat</h2>
+
+<div class="top-right">
+<button class="add" id="addBtn">
+＋ Ajouter une personne
+</button>
+
+<button class="logout" id="logoutBtn">
+Quitter
+</button>
+</div>
+</header>
+
+
+<div class="layout">
+
+<aside class="contacts" id="contacts">
+<div class="ctitle">👥 Mes contacts</div>
+<div id="contactList"></div>
+</aside>
+
+
+<main class="chat" id="chat">
+
+<div class="emptychat">
+<div>
+<h2>Bienvenue 👋</h2>
+<p>Ajoute une personne pour commencer.</p>
+</div>
+</div>
+
+</main>
+
+</div>
+</section>
+
+
+<div class="modal" id="addModal">
+
+<div class="modalbox">
+
+<h2>Ajouter une personne</h2>
+<p>Écris seulement son nom.</p>
+
+<input
+id="personName"
+placeholder="Nom de la personne"
+>
+
+<button class="dark" id="searchBtn">
+Rechercher
+</button>
+
+<div id="searchResult"></div>
+
+<button class="gray" id="closeAdd">
+Fermer
+</button>
+
+</div>
+</div>
+
+
+<div class="modal" id="incomingModal">
+
+<div class="modalbox">
+
+<div style="font-size:58px">📞</div>
+
+<h2>Appel entrant</h2>
+
+<p id="caller"></p>
+
+<button class="green" id="acceptBtn">
+✅ Accepter
+</button>
+
+<button class="red" id="rejectBtn">
+❌ Refuser
+</button>
+
+</div>
+</div>
+
+
+<div class="modal" id="callModal">
+
+<div class="modalbox">
+
+<div style="font-size:58px">📞</div>
+
+<h2 id="callName"></h2>
+
+<p id="callStatus">
+Connexion...
+</p>
+
+<button class="red" id="hangupBtn">
+📵 Raccrocher
+</button>
+
+</div>
+</div>
+
+
+<audio id="remoteAudio" autoplay></audio>
+
+
+<script>
+(() => {
+
+"use strict";
+
+const $ = id => document.getElementById(id);
+
+let socket =
+    typeof io === "function" ? io() : null;
+
+let myName =
+    localStorage.getItem("mauryName") || "";
+
+let contacts =
+    JSON.parse(
+        localStorage.getItem("mauryContacts") || "[]"
+    );
+
+let chats =
+    JSON.parse(
+        localStorage.getItem("mauryChats") || "{}"
+    );
+
+let selected = "";
+
+let online = [];
+
+let mediaRecorder = null;
+
+let chunks = [];
+
+let recording = false;
+
+let peer = null;
+
+let localStream = null;
+
+let currentCall = "";
+
+let incoming = "";
+
+const rtc = {
+    iceServers: [
+        {
+            urls: "stun:stun.l.google.com:19302"
+        }
+    ]
+};
+
+
+function save(){
+
+localStorage.setItem(
+"mauryName",
+myName
+);
+
+localStorage.setItem(
+"mauryContacts",
+JSON.stringify(contacts)
+);
+
+localStorage.setItem(
+"mauryChats",
+JSON.stringify(chats)
+);
+
+}
+
+
+function time(){
+
+const d = new Date();
+
+return String(d.getHours()).padStart(2,"0")
++ ":"
++ String(d.getMinutes()).padStart(2,"0");
+
+}
+
+
+function show(){
+
+$("welcome").style.display="none";
+
+$("app").style.display="block";
+
+renderContacts();
+
+}
+
+
+function login(){
+
+const n =
+$("name").value.trim();
+
+if(!n){
+
+alert("Écris ton nom.");
+
+return;
+
+}
+
+myName=n;
+
+save();
+
+if(socket){
+
+socket.emit(
+"register",
+myName
+);
+
+}
+
+show();
+
+}
+
+
+$("continueBtn").addEventListener(
+"click",
+login
+);
+
+
+$("name").addEventListener(
+"keydown",
+e=>{
+if(e.key==="Enter") login();
+}
+);
+
+
+if(myName){
+
+show();
+
+}
+
+
+$("logoutBtn").addEventListener(
+"click",
+()=>{
+
+localStorage.removeItem(
+"mauryName"
+);
+
+location.reload();
+
+}
+);
+
+
+$("addBtn").addEventListener(
+"click",
+()=>{
+
+$("addModal").style.display="flex";
+
+$("personName").value="";
+
+$("searchResult").textContent="";
+
+}
+);
+
+
+$("closeAdd").addEventListener(
+"click",
+()=>{
+
+$("addModal").style.display="none";
+
+}
+);
+
+
+if(socket){
+
+socket.on(
+"connect",
+()=>{
+
+if(myName){
+
+socket.emit(
+"register",
+myName
+);
+
+}
+
+});
+
+
+socket.on(
+"users",
+users=>{
+online=users;
+}
+);
+
+
+socket.on(
+"privateMessage",
+message=>{
+receive(message);
+}
+);
+
+
+socket.on(
+"privateAudio",
+message=>{
+receive(message);
+}
+);
+
+
+socket.on(
+"incoming-call",
+data=>{
+
+incoming=data.from;
+
+$("caller").textContent=
+data.from;
+
+$("incomingModal").style.display=
+"flex";
+
+}
+);
+
+
+socket.on(
+"call-rejected",
+()=>{
+
+closeCall();
+
+alert("L’appel a été refusé.");
+
+}
+);
+
+
+socket.on(
+"call-ended",
+closeCall
+);
+
+
+socket.on(
+"webrtc-offer",
+handleOffer
+);
+
+
+socket.on(
+"webrtc-answer",
+handleAnswer
+);
+
+
+socket.on(
+"webrtc-ice-candidate",
+handleIce
+);
+
+}
+
+
+$("searchBtn").addEventListener(
+"click",
+()=>{
+
+const n =
+$("personName").value.trim();
+
+if(!n){
+
+$("searchResult").textContent=
+"Écris un nom.";
+
+return;
+
+}
+
+if(
+n.toLowerCase() ===
+myName.toLowerCase()
+){
+
+$("searchResult").textContent=
+"Tu ne peux pas t’ajouter toi-même.";
+
+return;
+
+}
+
+const found =
+online.find(
+x =>
+x.toLowerCase() ===
+n.toLowerCase()
+);
+
+if(!found){
+
+$("searchResult").textContent=
+"Utilisateur introuvable ou hors ligne.";
+
+return;
+
+}
+
+$("searchResult").innerHTML="";
+
+const b =
+document.createElement("button");
+
+b.className="dark";
+
+b.textContent=
+"👤 Ajouter "+found;
+
+b.onclick=()=>{
+
+if(
+!contacts.some(
+x =>
+x.toLowerCase() ===
+found.toLowerCase()
+)
+){
+
+contacts.push(found);
+
+save();
+
+}
+
+renderContacts();
+
+$("addModal").style.display="none";
+
+};
+
+$("searchResult").appendChild(b);
+
+});
+
+
+function renderContacts(){
+
+const list =
+$("contactList");
+
+list.innerHTML="";
+
+if(!contacts.length){
+
+list.innerHTML=
+'<div class="empty">Aucun contact.<br><br>Appuie sur « ＋ Ajouter une personne ».</div>';
+
+return;
+
+}
+
+contacts.forEach(
+n=>{
+
+const d =
+document.createElement("div");
+
+d.className =
+"contact"+
+(
+n===selected
+?
+" active"
+:
+""
+);
+
+d.textContent=
+"👤 "+n;
+
+d.onclick=
+()=>openChat(n,d);
+
+list.appendChild(d);
+
+}
+);
+
+}
+
+
+function openChat(name,el){
+
+selected=name;
+
+if(!chats[name]){
+
+chats[name]=[];
+
+save();
+
+}
+
+document
+.querySelectorAll(".contact")
+.forEach(
+x=>x.classList.remove("active")
+);
+
+el.classList.add("active");
+
+$("contacts").classList.add("hide");
+
+$("chat").classList.add("mobile");
+
+$("chat").innerHTML=`
+
+<div class="chathead">
+
+<button
+id="back"
+style="
+border:0;
+background:transparent;
+font-size:24px;
+display:none
+">
+←
+</button>
+
+<div class="avatar">
+${name.charAt(0).toUpperCase()}
+</div>
+
+<strong>${escapeHtml(name)}</strong>
+
+<button
+id="call"
+class="call"
+>
+📞
+</button>
+
+</div>
+
+
+<div
+id="messages"
+class="messages"
+></div>
+
+
+<div class="composer">
+
+<button
+id="mic"
+class="mic"
+>
+🎙️
+</button>
+
+<input
+id="msg"
+placeholder="Écrire un message..."
+>
+
+<button
+id="send"
+class="send"
+>
+➤
+</button>
+
+</div>
+`;
+
+if(innerWidth<=700)
+$("back").style.display="block";
+
+
+$("back").onclick=()=>{
+
+$("contacts").classList.remove("hide");
+
+$("chat").classList.remove("mobile");
+
+};
+
+
+$("send").onclick=
+sendText;
+
+
+$("msg").onkeydown=
+e=>{
+if(e.key==="Enter")
+sendText();
+};
+
+
+$("mic").onclick=
+toggleAudio;
+
+
+$("call").onclick=
+startCall;
+
+
+renderMessages();
+
+}
+
+
+function sendText(){
+
+const inp=$("msg");
+
+if(
+!inp||
+!selected||
+!inp.value.trim()||
+!socket
+)return;
+
+socket.emit(
+"privateMessage",
+{
+to:selected,
+text:inp.value.trim()
+}
+);
+
+inp.value="";
+
+}
+
+
+function receive(m){
+
+const other =
+m.from===myName
+?
+m.to
+:
+m.from;
+
+if(!chats[other])
+chats[other]=[];
+
+chats[other].push(m);
+
+save();
+
+if(selected===other)
+renderMessages();
+
+}
+
+
+function renderMessages(){
+
+const b=$("messages");
+
+if(!b)
+return;
+
+b.innerHTML="";
+
+(chats[selected]||[])
+.forEach(
+m=>{
+
+const d=
+document.createElement("div");
+
+d.className=
+"msg"+
+(
+m.from===myName
+?
+" me"
+:
+""
+);
+
+
+if(m.type==="audio"){
+
+const a =
+document.createElement("audio");
+
+a.controls=true;
+
+a.src=m.audio;
+
+a.className="audio";
+
+d.appendChild(a);
+
+}
+else{
+
+d.appendChild(
+document.createTextNode(
+m.text||""
+)
+);
+
+}
+
+
+const t =
+document.createElement("span");
+
+t.className="time";
+
+t.textContent=
+m.time||"";
+
+d.appendChild(t);
+
+b.appendChild(d);
+
+}
+);
+
+b.scrollTop=
+b.scrollHeight;
+
+}
+
+
+async function toggleAudio(){
+
+if(!selected)
+return;
+
+if(recording){
+
+mediaRecorder.stop();
+
+return;
+
+}
+
+try{
+
+const s =
+await navigator
+.mediaDevices
+.getUserMedia({
+audio:true
+});
+
+chunks=[];
+
+mediaRecorder=
+new MediaRecorder(s);
+
+
+mediaRecorder.ondataavailable=
+e=>{
+
+if(e.data.size)
+chunks.push(e.data);
+
+};
+
+
+mediaRecorder.onstop=
+()=>{
+
+s.getTracks()
+.forEach(
+t=>t.stop()
+);
+
+const r =
+new FileReader();
+
+r.onloadend=
+()=>{
+
+if(socket){
+
+socket.emit(
+"privateAudio",
+{
+to:selected,
+audio:r.result,
+type:"audio",
+time:time()
+}
+);
+
+}
+
+};
+
+
+r.readAsDataURL(
+new Blob(
+chunks,
+{
+type:"audio/webm"
+}
+)
+);
+
+
+recording=false;
+
+const b=$("mic");
+
+if(b){
+
+b.textContent="🎙️";
+
+b.classList.remove("rec");
+
+}
+
+};
+
+
+mediaRecorder.start();
+
+recording=true;
+
+const b=$("mic");
+
+if(b){
+
+b.textContent="⏹️";
+
+b.classList.add("rec");
+
+}
+
+}
+catch{
+
+alert(
+"Autorise le microphone dans le navigateur."
+);
+
+}
+
+}
+
+
+/* APPELS AUDIO */
+
+async function startCall(){
+
+if(
+!selected||
+!socket
+)
+return;
+
+currentCall=selected;
+
+try{
+
+localStream =
+await navigator
+.mediaDevices
+.getUserMedia({
+audio:true
+});
+
+}
+catch{
+
+alert(
+"Autorise le microphone pour appeler."
+);
+
+return;
+
+}
+
+showCall(
+currentCall,
+"Appel en cours..."
+);
+
+peer=
+createPeer(
+currentCall
+);
+
+localStream
+.getTracks()
+.forEach(
+t=>
+peer.addTrack(
+t,
+localStream
+)
+);
+
+const offer=
+await peer.createOffer();
+
+await peer.setLocalDescription(
+offer
+);
+
+socket.emit(
+"call-user",
+{
+to:currentCall
+}
+);
+
+socket.emit(
+"webrtc-offer",
+{
+to:currentCall,
+offer:offer
+}
+);
+
+}
+
+
+$("acceptBtn").onclick=
+async()=>{
+
+$("incomingModal")
+.style.display="none";
+
+currentCall=incoming;
+
+try{
+
+localStream =
+await navigator
+.mediaDevices
+.getUserMedia({
+audio:true
+});
+
+}
+catch{
+
+alert(
+"Autorise le microphone pour répondre."
+);
+
+return;
+
+}
+
+showCall(
+currentCall,
+"Connexion..."
+);
+
+socket.emit(
+"accept-call",
+{
+to:currentCall
+}
+);
+
+};
+
+
+$("rejectBtn").onclick=
+()=>{
+
+$("incomingModal")
+.style.display="none";
+
+if(socket&&incoming){
+
+socket.emit(
+"reject-call",
+{
+to:incoming
+}
+);
+
+}
+
+incoming="";
+
+};
+
+
+$("hangupBtn").onclick=
+()=>{
+
+if(socket&&currentCall){
+
+socket.emit(
+"end-call",
+{
+to:currentCall
+}
+);
+
+}
+
+closeCall();
+
+};
+
+
+function showCall(name,status){
+
+$("callName").textContent=
+name;
+
+$("callStatus").textContent=
+status;
+
+$("callModal").style.display=
+"flex";
+
+}
+
+
+function closeCall(){
+
+$("callModal").style.display=
+"none";
+
+if(peer){
+
+peer.close();
+
+peer=null;
+
+}
+
+if(localStream){
+
+localStream
+.getTracks()
+.forEach(
+t=>t.stop()
+);
+
+localStream=null;
+
+}
+
+$("remoteAudio").srcObject=
+null;
+
+currentCall="";
+
+}
+
+
+function createPeer(other){
+
+const p =
+new RTCPeerConnection(rtc);
+
+p.onicecandidate=
+e=>{
+
+if(e.candidate){
+
+socket.emit(
+"webrtc-ice-candidate",
+{
+to:other,
+candidate:e.candidate
+}
+);
+
+}
+
+};
+
+
+p.ontrack=
+e=>{
+
+if(e.streams[0]){
+
+$("remoteAudio").srcObject=
+e.streams[0];
+
+}
+
+};
+
+
+p.onconnectionstatechange=
+()=>{
+
+if(
+p.connectionState===
+"connected"
+){
+
+$("callStatus").textContent=
+"Appel en cours";
+
+}
+
+if(
+[
+"failed",
+"disconnected",
+"closed"
+]
+.includes(
+p.connectionState
+)
+){
+
+closeCall();
+
+}
+
+};
+
+
+return p;
+
+}
+
+
+async function handleOffer(d){
+
+currentCall=d.from;
+
+if(!peer){
+
+peer=
+createPeer(
+d.from
+);
+
+if(!localStream){
+
+localStream=
+await navigator
+.mediaDevices
+.getUserMedia({
+audio:true
+});
+
+}
+
+localStream
+.getTracks()
+.forEach(
+t=>
+peer.addTrack(
+t,
+localStream
+)
+);
+
+}
+
+await peer.setRemoteDescription(
+new RTCSessionDescription(
+d.offer
+)
+);
+
+const answer=
+await peer.createAnswer();
+
+await peer.setLocalDescription(
+answer
+);
+
+socket.emit(
+"webrtc-answer",
+{
+to:d.from,
+answer:answer
+}
+);
+
+}
+
+
+async function handleAnswer(d){
+
+if(peer){
+
+await peer.setRemoteDescription(
+new RTCSessionDescription(
+d.answer
+)
+);
+
+}
+
+}
+
+
+async function handleIce(d){
+
+if(!peer)
+return;
+
+try{
+
+await peer.addIceCandidate(
+new RTCIceCandidate(
+d.candidate
+)
+);
+
+}
+catch{}
+
+}
+
+
+function escapeHtml(t){
+
+return String(t)
+.replaceAll("&","&amp;")
+.replaceAll("<","&lt;")
+.replaceAll(">","&gt;")
+.replaceAll('"',"&quot;")
+.replaceAll("'","&#039;");
+
+}
+
+})();
+</script>
+
+</body>
+</html>
