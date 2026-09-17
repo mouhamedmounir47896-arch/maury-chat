@@ -1,25 +1,45 @@
 const express = require("express");
 const http = require("http");
 const path = require("path");
+const fs = require("fs");
 const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static(path.join(__dirname, "public")));
+const publicFolder = path.join(__dirname, "public");
+const publicIndex = path.join(publicFolder, "index.html");
+const rootIndex = path.join(__dirname, "index.html");
+
+if (fs.existsSync(publicFolder)) {
+    app.use(express.static(publicFolder));
+}
+
+app.get("/", (req, res) => {
+    if (fs.existsSync(publicIndex)) {
+        return res.sendFile(publicIndex);
+    }
+
+    if (fs.existsSync(rootIndex)) {
+        return res.sendFile(rootIndex);
+    }
+
+    res.status(404).send("Maury Chat : index.html est introuvable.");
+});
 
 const users = new Map();
 
 io.on("connection", (socket) => {
+
     console.log("Utilisateur connecté");
 
     socket.on("register", (name) => {
-        const cleanName = String(name || "").trim();
 
-        if (!cleanName) {
-            return;
-        }
+        const cleanName =
+            String(name || "").trim();
+
+        if (!cleanName) return;
 
         users.set(cleanName.toLowerCase(), {
             name: cleanName,
@@ -31,198 +51,220 @@ io.on("connection", (socket) => {
         sendUsers();
     });
 
+
     socket.on("privateMessage", (data) => {
+
         const from = socket.data.userName;
-        const to = String(data && data.to ? data.to : "").trim();
-        const text = String(data && data.text ? data.text : "").trim();
+        const to =
+            String(data?.to || "").trim();
+        const text =
+            String(data?.text || "").trim();
 
-        if (!from || !to || !text) {
-            return;
-        }
+        if (!from || !to || !text) return;
 
-        const receiver = users.get(to.toLowerCase());
+        const receiver =
+            users.get(to.toLowerCase());
 
-        if (!receiver) {
-            socket.emit("errorMessage", "Utilisateur introuvable.");
-            return;
-        }
+        if (!receiver) return;
 
         const message = {
-            from: from,
+            from,
             to: receiver.name,
-            text: text,
+            text,
             type: "text",
             time: getTime()
         };
 
-        io.to(receiver.socketId).emit("privateMessage", message);
-        socket.emit("privateMessage", message);
+        io.to(receiver.socketId)
+            .emit("privateMessage", message);
+
+        socket.emit(
+            "privateMessage",
+            message
+        );
     });
 
+
     socket.on("privateAudio", (data) => {
+
         const from = socket.data.userName;
-        const to = String(data && data.to ? data.to : "").trim();
-        const audio = data && data.audio ? data.audio : null;
+        const to =
+            String(data?.to || "").trim();
+        const audio = data?.audio;
 
-        if (!from || !to || !audio) {
-            return;
-        }
+        if (!from || !to || !audio) return;
 
-        const receiver = users.get(to.toLowerCase());
+        const receiver =
+            users.get(to.toLowerCase());
 
-        if (!receiver) {
-            socket.emit("errorMessage", "Utilisateur introuvable.");
-            return;
-        }
+        if (!receiver) return;
 
         const message = {
-            from: from,
+            from,
             to: receiver.name,
-            audio: audio,
+            audio,
             type: "audio",
             time: getTime()
         };
 
-        io.to(receiver.socketId).emit("privateAudio", message);
-        socket.emit("privateAudio", message);
+        io.to(receiver.socketId)
+            .emit("privateAudio", message);
+
+        socket.emit(
+            "privateAudio",
+            message
+        );
     });
+
+
+    /* APPELS AUDIO */
 
     socket.on("call-user", (data) => {
+
         const from = socket.data.userName;
-        const to = String(data && data.to ? data.to : "").trim();
+        const to =
+            String(data?.to || "").trim();
 
-        if (!from || !to) {
-            return;
-        }
+        if (!from || !to) return;
 
-        const receiver = users.get(to.toLowerCase());
+        const receiver =
+            users.get(to.toLowerCase());
 
-        if (!receiver) {
-            socket.emit("errorMessage", "Utilisateur introuvable.");
-            return;
-        }
+        if (!receiver) return;
 
-        io.to(receiver.socketId).emit("incoming-call", {
-            from: from
-        });
+        io.to(receiver.socketId)
+            .emit("incoming-call", {
+                from
+            });
     });
+
 
     socket.on("accept-call", (data) => {
+
         const from = socket.data.userName;
-        const to = String(data && data.to ? data.to : "").trim();
+        const to =
+            String(data?.to || "").trim();
 
-        if (!from || !to) {
-            return;
-        }
+        if (!from || !to) return;
 
-        const receiver = users.get(to.toLowerCase());
+        const receiver =
+            users.get(to.toLowerCase());
 
-        if (!receiver) {
-            return;
-        }
+        if (!receiver) return;
 
-        io.to(receiver.socketId).emit("call-accepted", {
-            from: from
-        });
+        io.to(receiver.socketId)
+            .emit("call-accepted", {
+                from
+            });
     });
+
 
     socket.on("reject-call", (data) => {
+
         const from = socket.data.userName;
-        const to = String(data && data.to ? data.to : "").trim();
+        const to =
+            String(data?.to || "").trim();
 
-        if (!from || !to) {
-            return;
-        }
+        if (!from || !to) return;
 
-        const receiver = users.get(to.toLowerCase());
+        const receiver =
+            users.get(to.toLowerCase());
 
-        if (!receiver) {
-            return;
-        }
+        if (!receiver) return;
 
-        io.to(receiver.socketId).emit("call-rejected", {
-            from: from
-        });
+        io.to(receiver.socketId)
+            .emit("call-rejected", {
+                from
+            });
     });
+
 
     socket.on("end-call", (data) => {
+
         const from = socket.data.userName;
-        const to = String(data && data.to ? data.to : "").trim();
+        const to =
+            String(data?.to || "").trim();
 
-        if (!from || !to) {
-            return;
-        }
+        if (!from || !to) return;
 
-        const receiver = users.get(to.toLowerCase());
+        const receiver =
+            users.get(to.toLowerCase());
 
-        if (!receiver) {
-            return;
-        }
+        if (!receiver) return;
 
-        io.to(receiver.socketId).emit("call-ended", {
-            from: from
-        });
+        io.to(receiver.socketId)
+            .emit("call-ended", {
+                from
+            });
     });
+
+
+    /* WEBRTC */
 
     socket.on("webrtc-offer", (data) => {
-        const to = String(data && data.to ? data.to : "").trim();
 
-        if (!to) {
-            return;
-        }
+        const to =
+            String(data?.to || "").trim();
 
-        const receiver = users.get(to.toLowerCase());
+        if (!to) return;
 
-        if (!receiver) {
-            return;
-        }
+        const receiver =
+            users.get(to.toLowerCase());
 
-        io.to(receiver.socketId).emit("webrtc-offer", {
-            from: socket.data.userName,
-            offer: data.offer
-        });
+        if (!receiver) return;
+
+        io.to(receiver.socketId)
+            .emit("webrtc-offer", {
+                from: socket.data.userName,
+                offer: data.offer
+            });
     });
+
 
     socket.on("webrtc-answer", (data) => {
-        const to = String(data && data.to ? data.to : "").trim();
 
-        if (!to) {
-            return;
-        }
+        const to =
+            String(data?.to || "").trim();
 
-        const receiver = users.get(to.toLowerCase());
+        if (!to) return;
 
-        if (!receiver) {
-            return;
-        }
+        const receiver =
+            users.get(to.toLowerCase());
 
-        io.to(receiver.socketId).emit("webrtc-answer", {
-            from: socket.data.userName,
-            answer: data.answer
-        });
+        if (!receiver) return;
+
+        io.to(receiver.socketId)
+            .emit("webrtc-answer", {
+                from: socket.data.userName,
+                answer: data.answer
+            });
     });
+
 
     socket.on("webrtc-ice-candidate", (data) => {
-        const to = String(data && data.to ? data.to : "").trim();
 
-        if (!to) {
-            return;
-        }
+        const to =
+            String(data?.to || "").trim();
 
-        const receiver = users.get(to.toLowerCase());
+        if (!to) return;
 
-        if (!receiver) {
-            return;
-        }
+        const receiver =
+            users.get(to.toLowerCase());
 
-        io.to(receiver.socketId).emit("webrtc-ice-candidate", {
-            from: socket.data.userName,
-            candidate: data.candidate
-        });
+        if (!receiver) return;
+
+        io.to(receiver.socketId)
+            .emit("webrtc-ice-candidate", {
+                from: socket.data.userName,
+                candidate: data.candidate
+            });
     });
 
+
     socket.on("disconnect", () => {
-        const name = socket.data.userName;
+
+        const name =
+            socket.data.userName;
 
         if (name) {
             users.delete(name.toLowerCase());
@@ -232,14 +274,22 @@ io.on("connection", (socket) => {
 
         console.log("Utilisateur déconnecté");
     });
+
 });
 
+
 function sendUsers() {
-    const list = Array.from(users.values()).map((user) => user.name);
+
+    const list =
+        Array.from(users.values())
+            .map(user => user.name);
+
     io.emit("users", list);
 }
 
+
 function getTime() {
+
     const now = new Date();
 
     return (
@@ -249,8 +299,16 @@ function getTime() {
     );
 }
 
-const PORT = process.env.PORT || 10000;
 
-server.listen(PORT, "0.0.0.0", () => {
-    console.log("Maury Chat démarré sur le port " + PORT);
-});
+const PORT =
+    process.env.PORT || 10000;
+
+server.listen(
+    PORT,
+    "0.0.0.0",
+    () => {
+        console.log(
+            "Maury Chat démarré sur le port " + PORT
+        );
+    }
+);
